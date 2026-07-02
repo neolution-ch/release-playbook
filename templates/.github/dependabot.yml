@@ -1,0 +1,27 @@
+# Dependabot configuration. The Dependabot Changeset workflow auto-generates a
+# changeset for every PR opened here, so these updates flow through the normal
+# release process. Adjust the ecosystems, directories, and schedule to your repo.
+version: 2
+updates:
+  # npm dependencies. `directories` (with globs) covers the root and every
+  # workspace package, so a dependency bump inside packages/* is detected and
+  # gets a real version bump. Drop the "/packages/*" entry for a single-package repo.
+  - package-ecosystem: "npm"
+    directories:
+      - "/"
+      - "/packages/*"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      # Batch all non-major updates into one PR to reduce noise (and one changeset).
+      npm-non-major:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Keep the pinned GitHub Actions in these workflows up to date too.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
