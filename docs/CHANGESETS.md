@@ -741,7 +741,7 @@ If the PR body can't be parsed (unexpected format), the changeset falls back to 
 The workflow (`.github/workflows/dependabot-changeset.yml`) and script (`scripts/generate-dependabot-changeset.mjs`) are provided in [`templates/`](../templates/) — copy them into your repo. The only manual step is adding **Dependabot secrets**:
 
 1. Go to **Settings** → **Secrets and variables** → **Dependabot**
-2. Add `CHANGESETS_BOT_APP_ID` — same value as the existing Actions secret
+2. Add `CHANGESETS_BOT_CLIENT_ID` — same value as the existing Actions secret
 3. Add `CHANGESETS_BOT_PRIVATE_KEY` — same value as the existing Actions secret
 
 > **Why Dependabot secrets?** Dependabot PRs cannot access regular Actions secrets for security reasons. GitHub provides a separate secrets store specifically for Dependabot-triggered workflows. This avoids using `pull_request_target` (which runs with elevated privileges and is a security risk).
@@ -754,14 +754,14 @@ The workflow (`.github/workflows/dependabot-changeset.yml`) and script (`scripts
 
 By default this setup publishes to **GitHub Packages** (private/restricted). To publish to the **public npm registry** (`registry.npmjs.org`) instead, apply **all** of the following — changing only some of them silently fails:
 
-| # | File | Change | Why |
-| - | ---- | ------ | --- |
-| 1 | `.changeset/config.json` | `"access": "restricted"` → `"public"` | Scoped packages default to private on npm; the first publish returns HTTP 403 without this |
-| 2 | `.npmrc` | Remove the `@neolution-ch:registry=…github.com` line (or set `registry=https://registry.npmjs.org`) | `.npmrc` overrides the workflow's registry — otherwise publishing silently goes to GitHub Packages |
-| 3 | `packages/*/package.json` | Set `publishConfig.registry` to `https://registry.npmjs.org` (or remove `publishConfig`) | Overrides `.npmrc` during publish |
-| 4 | `.github/workflows/release.yml` | `registry-url: "https://registry.npmjs.org"` | Points npm auth at the public registry |
-| 5 | `.github/workflows/release.yml` | `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}` | `GITHUB_TOKEN` only authenticates to GitHub Packages; add an npm automation token as the `NPM_TOKEN` secret |
-| 6 | `.github/workflows/release.yml` | Add `id-token: write` to `permissions` and append `--provenance` to the publish command | Publishes with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) (supply-chain attestation) — recommended for public packages |
+| #   | File                            | Change                                                                                              | Why                                                                                                                                                   |
+| --- | ------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `.changeset/config.json`        | `"access": "restricted"` → `"public"`                                                               | Scoped packages default to private on npm; the first publish returns HTTP 403 without this                                                            |
+| 2   | `.npmrc`                        | Remove the `@neolution-ch:registry=…github.com` line (or set `registry=https://registry.npmjs.org`) | `.npmrc` overrides the workflow's registry — otherwise publishing silently goes to GitHub Packages                                                    |
+| 3   | `packages/*/package.json`       | Set `publishConfig.registry` to `https://registry.npmjs.org` (or remove `publishConfig`)            | Overrides `.npmrc` during publish                                                                                                                     |
+| 4   | `.github/workflows/release.yml` | `registry-url: "https://registry.npmjs.org"`                                                        | Points npm auth at the public registry                                                                                                                |
+| 5   | `.github/workflows/release.yml` | `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`                                                         | `GITHUB_TOKEN` only authenticates to GitHub Packages; add an npm automation token as the `NPM_TOKEN` secret                                           |
+| 6   | `.github/workflows/release.yml` | Add `id-token: write` to `permissions` and append `--provenance` to the publish command             | Publishes with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) (supply-chain attestation) — recommended for public packages |
 
 Everything else is registry-agnostic: the CI changeset gate, the Version Packages PR, changelog generation, dist-tags/backport tags, pkg.pr.new, and GitHub Releases all work identically.
 
@@ -836,10 +836,10 @@ Because every package here is private, `.changeset/config.json` **must** opt the
 
 Both sub-options matter, and each fails differently:
 
-| Missing | Symptom |
-| ------- | ------- |
+| Missing         | Symptom                                                                                                                                                                                                                                                                                             |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `version: true` | `changeset status` treats every package as unversionable, so the **Changeset Check passes on every PR** — the gate is a silent no-op, not a failure. `changeset` and `changeset --empty` meanwhile exit 1 with an error that never mentions `privatePackages`, so contributors can't add one either |
-| `tag: true` | `changeset publish` prints "No unpublished projects to publish.", exits 0, and creates no git tags — so no GitHub Release, and `nuget-publish.yml` never triggers |
+| `tag: true`     | `changeset publish` prints "No unpublished projects to publish.", exits 0, and creates no git tags — so no GitHub Release, and `nuget-publish.yml` never triggers                                                                                                                                   |
 
 > The upstream migration guide suggests `{ "version": true, "tag": false }` for restoring v2 behavior. That is the right value for a repo whose private packages are internal fixtures; it is the **wrong** value here, because the git tags are the trigger for the NuGet publish.
 
@@ -1003,14 +1003,14 @@ If you need more time, the v2 line stays available under the `maintenance-v2` di
 
 ### Step 3: Update `.changeset/config.json`
 
-| v2 | v3 |
-| -- | -- |
-| `"$schema": ".../@changesets/config@3.x/schema.json"` | `"$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json"` |
-| `"prettier": false` | `"format": false` — the new option also covers Oxfmt, Deno, and dprint, and defaults to `"auto"` detection |
-| `"access": "private"` | `"access": "restricted"` |
-| `"___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": { "useCalculatedVersionForSnapshots": true }` | `"snapshot": { "useCalculatedVersion": true }` |
-| `"baseBranch": "main"` | Optional — `main` is now the default. Keep an explicit `"master"` if that is your default branch |
-| private packages versioned implicitly | `"privatePackages": { "version": true, "tag": false }` to keep that behavior — but use `"tag": true` if you rely on the git tags, as the [NuGet setup](#adapting-for-nuget-packages) does |
+| v2                                                                                                  | v3                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"$schema": ".../@changesets/config@3.x/schema.json"`                                               | `"$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json"`                                                                                                                     |
+| `"prettier": false`                                                                                 | `"format": false` — the new option also covers Oxfmt, Deno, and dprint, and defaults to `"auto"` detection                                                                                |
+| `"access": "private"`                                                                               | `"access": "restricted"`                                                                                                                                                                  |
+| `"___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": { "useCalculatedVersionForSnapshots": true }` | `"snapshot": { "useCalculatedVersion": true }`                                                                                                                                            |
+| `"baseBranch": "main"`                                                                              | Optional — `main` is now the default. Keep an explicit `"master"` if that is your default branch                                                                                          |
+| private packages versioned implicitly                                                               | `"privatePackages": { "version": true, "tag": false }` to keep that behavior — but use `"tag": true` if you rely on the git tags, as the [NuGet setup](#adapting-for-nuget-packages) does |
 
 > **The private-package default is the one that bites.** v2 versioned private packages (without tagging them); v3 does neither unless you ask. A repo that uses changesets purely to version things it never publishes to npm — the [NuGet setup](#adapting-for-nuget-packages) is exactly this — will otherwise go quiet: no version bumps, no tags, no GitHub Releases, and no downstream publish. If you worked around the v2 default by listing fixtures in `ignore`, you can drop those entries now.
 
@@ -1020,19 +1020,19 @@ If you need more time, the v2 line stays available under the `maintenance-v2` di
 
 `changesets/action@v2` renamed every input and output to kebab-case, and it no longer reads the `GITHUB_TOKEN` environment variable:
 
-| v1 | v2 |
-| -- | -- |
-| `with: publish:` | `with: publish-script:` |
-| `with: version:` | `with: version-script:` |
-| `with: commit:` | `with: commit-message:` |
-| `with: title:` | `with: pr-title:` |
-| `with: branch:` | `with: pr-base-branch:` |
-| `with: commitMode:` | `with: push-with-git-cli:` — a boolean, not an enum |
-| `with: setupGitUser:` | Gone. Git identity is handled automatically: an identity you already configured is kept, otherwise `github-actions[bot]` |
-| `env: GITHUB_TOKEN:` | `with: github-token:` |
-| `outputs.publishedPackages` | `outputs.published-packages` |
-| `outputs.hasChangesets` | `outputs.has-changesets` |
-| `outputs.pullRequestNumber` | `outputs.pr-number` |
+| v1                          | v2                                                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `with: publish:`            | `with: publish-script:`                                                                                                  |
+| `with: version:`            | `with: version-script:`                                                                                                  |
+| `with: commit:`             | `with: commit-message:`                                                                                                  |
+| `with: title:`              | `with: pr-title:`                                                                                                        |
+| `with: branch:`             | `with: pr-base-branch:`                                                                                                  |
+| `with: commitMode:`         | `with: push-with-git-cli:` — a boolean, not an enum                                                                      |
+| `with: setupGitUser:`       | Gone. Git identity is handled automatically: an identity you already configured is kept, otherwise `github-actions[bot]` |
+| `env: GITHUB_TOKEN:`        | `with: github-token:`                                                                                                    |
+| `outputs.publishedPackages` | `outputs.published-packages`                                                                                             |
+| `outputs.hasChangesets`     | `outputs.has-changesets`                                                                                                 |
+| `outputs.pullRequestNumber` | `outputs.pr-number`                                                                                                      |
 
 You don't have to find them all by reading: v2 **fails the step with a migration error** naming any old input it was handed, and it refuses to run at all against a Changesets v2 CLI. That is why the CLI and the action have to move in the same PR.
 
@@ -1177,7 +1177,7 @@ The Release workflow uses a GitHub App token so that Version Packages PRs trigge
 2. Generate a private key and note the App ID
 3. Install the App on the repository (or all org repos)
 4. Add secrets (org-level recommended for reuse across repos). The `templates/` workflows reference these names — use the same, or update both to match:
-   - `CHANGESETS_BOT_APP_ID`
+   - `CHANGESETS_BOT_CLIENT_ID`
    - `CHANGESETS_BOT_PRIVATE_KEY`
 
 ### Step 6: Configure branch protection
@@ -1226,16 +1226,16 @@ Once this works end-to-end, the migration is complete. All the scenarios documen
 
 The changesets config lives at `.changeset/config.json`:
 
-| Option                       | Value                                              | Meaning                                                     |
-| ---------------------------- | -------------------------------------------------- | ----------------------------------------------------------- |
+| Option                       | Value                                              | Meaning                                                                                                                                                                                                                               |
+| ---------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `changelog`                  | `@changesets/changelog-github`                     | Changelogs include PR links and contributor attribution. The `repo` option defaults to `$GITHUB_REPOSITORY`, so it only strictly matters when running `changeset version` outside Actions — keep it set so local runs behave the same |
-| `commit`                     | `false`                                            | Changeset commands don't auto-commit                        |
-| `fixed`                      | `[["@neolution-ch/pkg-a", "@neolution-ch/pkg-b"]]` | Both packages always share the same version                 |
-| `access`                     | `restricted`                                       | npm CLI publish flag. On npmjs.org `restricted` = private, `public` = public; **ignored by GitHub Packages** (visibility is set by repo/package settings). See [Publishing to public npm](#publishing-to-public-npm). |
-| `baseBranch`                 | `main`                                             | Comparisons are made against `main`. `main` is also the default, so the line can be omitted |
-| `updateInternalDependencies` | `patch`                                            | Internal dependency ranges are updated on every release     |
-| `format`                     | _(unset → `"auto"`)_                               | Formatter for generated changesets and changelogs. `"auto"` detects Prettier, Oxfmt, Deno, or dprint; `false` disables formatting |
-| `privatePackages`            | _(unset → `{ "version": false, "tag": false }`)_  | Whether `"private": true` packages are versioned and tagged. Set `{ "version": true, "tag": true }` for repos that version packages they don't publish to npm |
+| `commit`                     | `false`                                            | Changeset commands don't auto-commit                                                                                                                                                                                                  |
+| `fixed`                      | `[["@neolution-ch/pkg-a", "@neolution-ch/pkg-b"]]` | Both packages always share the same version                                                                                                                                                                                           |
+| `access`                     | `restricted`                                       | npm CLI publish flag. On npmjs.org `restricted` = private, `public` = public; **ignored by GitHub Packages** (visibility is set by repo/package settings). See [Publishing to public npm](#publishing-to-public-npm).                 |
+| `baseBranch`                 | `main`                                             | Comparisons are made against `main`. `main` is also the default, so the line can be omitted                                                                                                                                           |
+| `updateInternalDependencies` | `patch`                                            | Internal dependency ranges are updated on every release                                                                                                                                                                               |
+| `format`                     | _(unset → `"auto"`)_                               | Formatter for generated changesets and changelogs. `"auto"` detects Prettier, Oxfmt, Deno, or dprint; `false` disables formatting                                                                                                     |
+| `privatePackages`            | _(unset → `{ "version": false, "tag": false }`)_   | Whether `"private": true` packages are versioned and tagged. Set `{ "version": true, "tag": true }` for repos that version packages they don't publish to npm                                                                         |
 
 ### CI Workflows
 

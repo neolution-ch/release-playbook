@@ -25,7 +25,7 @@ unless you opt back in.
 1. Copy [`templates/`](templates/) into your repo root and customize the marked spots
    (see [templates/README.md](templates/README.md)).
 2. Set each package's `package.json` `version` to its current published version.
-3. Add the `CHANGESETS_BOT_APP_ID` / `CHANGESETS_BOT_PRIVATE_KEY` secrets (Actions **and**
+3. Add the `CHANGESETS_BOT_CLIENT_ID` / `CHANGESETS_BOT_PRIVATE_KEY` secrets (Actions **and**
    Dependabot).
 4. Turn on branch protection for `main` requiring the **Changeset Check** status check.
 5. Open a PR with a changeset and verify the flow end-to-end.

@@ -32,12 +32,12 @@ Do **not** copy this `README.md`.
 
 ## What you must customize
 
-| File | Change |
-| ---- | ------ |
-| `.changeset/config.json` | Set `changelog[1].repo` to `neolution-ch/<your-repo>`. Set the `fixed` array to your package group (or `[]` if you don't group packages — see note). For **public npm**, set `access` to `"public"`. If your packages are `"private": true` (e.g. a NuGet repo), add `"privatePackages": { "version": true, "tag": true }` — Changesets v3 skips private packages otherwise. |
-| `.npmrc` | Keep for GitHub Packages under the `@neolution-ch` scope. For **public npm**, remove it (or point it at `registry.npmjs.org`) — it overrides the workflow's registry otherwise. |
-| `.github/dependabot.yml` | Adjust `directories`/ecosystems to your layout. Remove `/packages/*` for a single-package repo. |
-| `.github/workflows/release.yml` | For **public npm**: set `registry-url` to `https://registry.npmjs.org`, `NODE_AUTH_TOKEN` to `${{ secrets.NPM_TOKEN }}`, add `id-token: write` permission, and append `--provenance` to the publish command. |
+| File                            | Change                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.changeset/config.json`        | Set `changelog[1].repo` to `neolution-ch/<your-repo>`. Set the `fixed` array to your package group (or `[]` if you don't group packages — see note). For **public npm**, set `access` to `"public"`. If your packages are `"private": true` (e.g. a NuGet repo), add `"privatePackages": { "version": true, "tag": true }` — Changesets v3 skips private packages otherwise. |
+| `.npmrc`                        | Keep for GitHub Packages under the `@neolution-ch` scope. For **public npm**, remove it (or point it at `registry.npmjs.org`) — it overrides the workflow's registry otherwise.                                                                                                                                                                                              |
+| `.github/dependabot.yml`        | Adjust `directories`/ecosystems to your layout. Remove `/packages/*` for a single-package repo.                                                                                                                                                                                                                                                                              |
+| `.github/workflows/release.yml` | For **public npm**: set `registry-url` to `https://registry.npmjs.org`, `NODE_AUTH_TOKEN` to `${{ secrets.NPM_TOKEN }}`, add `id-token: write` permission, and append `--provenance` to the publish command.                                                                                                                                                                 |
 
 ## Required secrets
 
@@ -45,7 +45,7 @@ The Release and Dependabot Changeset workflows authenticate as a GitHub App so t
 re-trigger CI. Add these secrets (an **Actions** secret and a **Dependabot** secret with the same
 values — Dependabot has a separate secret store):
 
-- `CHANGESETS_BOT_APP_ID`
+- `CHANGESETS_BOT_CLIENT_ID`
 - `CHANGESETS_BOT_PRIVATE_KEY`
 
 > These names must match whatever your org actually configured. If neolution-ch already created
