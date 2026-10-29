@@ -51,6 +51,7 @@ This is the neolution-ch guide for working with changesets. It covers **every sc
     - [Repository structure](#repository-structure)
     - [Version sync script](#version-sync-script)
     - [NuGet publish workflow](#nuget-publish-workflow)
+    - [Dependabot changesets for NuGet](#dependabot-changesets-for-nuget)
     - [What stays the same](#what-stays-the-same)
   - [Upgrading from Changesets v2](#upgrading-from-changesets-v2)
     - [Step 1: Check Node and package manager versions](#step-1-check-node-and-package-manager-versions)
@@ -503,14 +504,14 @@ When `main` has moved on to a new major version (e.g., v2.x) but you need to rel
 The `.x` is just a naming convention meaning "this branch handles all releases for this major version." It is **not** a git pattern or wildcard — it's a plain branch name.
 
 **Key rules:**
-- The Release workflow **automatically creates** this branch when a new major version is published from `main` (e.g., publishing `2.0.0` creates `release/v1.x` from the last v1 tag)
+- The Release workflow **automatically creates** this branch when a new major version is published from `main` (e.g., publishing `2.0.0` creates `release/v1.x` from the highest stable `1.x.y` tag of the published packages)
 - You **reuse** it for all subsequent patches and minor releases for that major version
 - It accumulates releases linearly: v1.5.2 → v1.5.3 → v1.6.0 → v1.6.1 → ...
 - The CI and Release workflows are configured to run on `release/**` branches, so the process is fully automated — just like `main`
 
 #### Setting up a release branch (manual fallback)
 
-In most cases the release branch is created automatically. If you need to create one manually (e.g., retroactively):
+In most cases the release branch is created automatically. Create one manually when you need it retroactively, or when the Release run shows a "Could not create release/vX.x" warning. GitHub can refuse the workflow token when branching from an older commit (HTTP 403), and the warning then prints the exact `git push` command to run instead:
 
 ```bash
 # Create the release branch from the last v1 tag
@@ -763,6 +764,8 @@ By default this setup publishes to **GitHub Packages** (private/restricted). To 
 | 5   | `.github/workflows/release.yml` | `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`                                                         | `GITHUB_TOKEN` only authenticates to GitHub Packages; add an npm automation token as the `NPM_TOKEN` secret                                           |
 | 6   | `.github/workflows/release.yml` | Add `id-token: write` to `permissions` and append `--provenance` to the publish command             | Publishes with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) (supply-chain attestation) — recommended for public packages |
 
+The template's `packages: write` permission only serves GitHub Packages, so drop it from `release.yml` as well.
+
 Everything else is registry-agnostic: the CI changeset gate, the Version Packages PR, changelog generation, dist-tags/backport tags, pkg.pr.new, and GitHub Releases all work identically.
 
 > **pnpm repos:** when Changesets checks whether a version is already published, it follows pnpm's registry resolution and ignores `publishConfig.registry` and scope-based registry overrides in `package.json`. Row 3 above still governs where `npm publish` sends the tarball, but the *existence* check reads `.npmrc` — so a pnpm repo needs the registry configured there as well.
@@ -808,7 +811,7 @@ Each .NET project needs a minimal `package.json` so changesets can track its ver
 ├── package.json                  ← root workspace
 └── .github/workflows/
     ├── ci.yml
-    ├── release.yml               ← same as npm version
+    ├── release.yml               ← npm version minus the registry settings
     └── nuget-publish.yml         ← new, triggers on release
 ```
 
@@ -903,6 +906,8 @@ Then configure the Release workflow to use it:
 
 This way the Version Packages PR includes both `package.json` and `.csproj` version bumps.
 
+Nothing is published to npm, so the NuGet Release workflow also drops the template's `packages: write` permission, the `registry-url` input of **Setup Node.js**, and the `NODE_AUTH_TOKEN` env of the changesets step.
+
 ### NuGet publish workflow
 
 Add `.github/workflows/nuget-publish.yml`:
@@ -923,10 +928,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
 
       - name: Extract version from tag
         id: version
@@ -964,6 +969,33 @@ jobs:
 
 > **Key detail:** The `find packages/ -name "package.json" -delete` step removes all `package.json` files before packing so they don't end up inside the `.nupkg`. Leave the generated `CHANGELOG.md` files alone — `changesets/action` reads the entry for the released version out of the `CHANGELOG.md` beside each tagged `package.json` to build the GitHub Release body, and errors if the file exists without a matching entry.
 
+### Dependabot changesets for NuGet
+
+The template's [Dependabot Changeset](#dependabot-automation) workflow decides between a real bump and an empty changeset by looking for changed `packages/*/package.json` files. In a NuGet repo those files are version-tracking stubs that Dependabot never touches, so every NuGet update would get an empty changeset and never ship. Point the detect step at the files that do change instead:
+
+```yaml
+- name: Detect package-affecting changes
+  id: detect-changes
+  if: steps.check-changeset.outputs.exists == 'false'
+  run: |
+      # A shipped NuGet package is affected when its declared dependencies
+      # (a csproj or the central Directory.Packages.props) or its resolved
+      # dependency graph (packages.lock.json) change. Any Dependabot update
+      # that touches none of these (root npm dev-deps, GitHub Actions, other
+      # tooling) ships no code and gets an empty changeset instead.
+      CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'packages/*/*.csproj' 'packages/*/packages.lock.json' 'Directory.Packages.props')
+      if [ -n "$CHANGED" ]; then
+        echo "changed=true" >> "$GITHUB_OUTPUT"
+        echo "Package-affecting files changed:"
+        echo "$CHANGED"
+      else
+        echo "changed=false" >> "$GITHUB_OUTPUT"
+        echo "No package-affecting changes detected (tooling-only update)"
+      fi
+```
+
+Adjust the `packages/*` paths to where your projects live. Keep the step's `id` and output name, because the **Generate changeset** step passes the result to the script as `WORKSPACE_PACKAGES_CHANGED`.
+
 ### What stays the same
 
 Everything documented in this guide works identically for NuGet repos:
@@ -972,7 +1004,7 @@ Everything documented in this guide works identically for NuGet repos:
 - CI blocks PRs without changesets
 - The Version Packages PR shows version bumps and changelog updates
 - Prereleases, backporting, and fixed packages all work the same
-- The only difference is the additional `nuget-publish.yml` workflow that runs after each GitHub Release
+- The only differences are the additional `nuget-publish.yml` workflow that runs after each GitHub Release and the Dependabot detection paths above
 
 ---
 
