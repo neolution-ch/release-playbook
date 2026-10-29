@@ -55,6 +55,13 @@ pnpm blocks dependency build scripts by default. List the ones you need under `a
 `.npmrc` as well (see the pnpm note in
 [Publishing to public npm](../docs/CHANGESETS.md#publishing-to-public-npm)).
 
+## Action pins
+
+The templates pin actions to major versions (`actions/checkout@v7`). A repo that pins exact
+versions (`actions/checkout@v7.0.1`) can keep doing so: Dependabot keeps the precision of each ref
+when it updates it. `changesets/action@v2` is a branch, not a tag, so Dependabot never proposes
+updates for it. Pin an exact tag such as `@v2.1.2` if you want Dependabot to track it.
+
 ## Required secrets
 
 The Release and Dependabot Changeset workflows authenticate as a GitHub App so their pushes/PRs
