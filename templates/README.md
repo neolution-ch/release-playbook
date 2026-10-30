@@ -37,7 +37,30 @@ Do **not** copy this `README.md`.
 | `.changeset/config.json`        | Set `changelog[1].repo` to `neolution-ch/<your-repo>`. Set the `fixed` array to your package group (or `[]` if you don't group packages — see note). For **public npm**, set `access` to `"public"`. If your packages are `"private": true` (e.g. a NuGet repo), add `"privatePackages": { "version": true, "tag": true }` — Changesets v3 skips private packages otherwise. |
 | `.npmrc`                        | Keep for GitHub Packages under the `@neolution-ch` scope. For **public npm**, remove it (or point it at `registry.npmjs.org`) — it overrides the workflow's registry otherwise.                                                                                                                                                                                              |
 | `.github/dependabot.yml`        | Adjust `directories`/ecosystems to your layout. Remove `/packages/*` for a single-package repo.                                                                                                                                                                                                                                                                              |
-| `.github/workflows/release.yml` | For **public npm**: set `registry-url` to `https://registry.npmjs.org`, `NODE_AUTH_TOKEN` to `${{ secrets.NPM_TOKEN }}`, add `id-token: write` permission, and append `--provenance` to the publish command.                                                                                                                                                                 |
+| `.github/workflows/release.yml` | For **public npm**: set `registry-url` to `https://registry.npmjs.org`, `NODE_AUTH_TOKEN` to `${{ secrets.NPM_TOKEN }}`, replace the `packages: write` permission with `id-token: write`, and append `--provenance` to the publish command. For **NuGet**: drop `packages: write`, `registry-url` and `NODE_AUTH_TOKEN`, and add the `version-script` from [Adapting for NuGet Packages](../docs/CHANGESETS.md#version-sync-script). |
+| `.github/workflows/ci.yml`      | The **Check for changesets** step is skipped only for Version Packages PRs opened by `csag-changesets-bot[bot]`. If your GitHub App has a different name, use its bot login there.                                                                                                                                                                                          |
+| `.github/workflows/dependabot-changeset.yml` | For **NuGet**, replace the detect step so it watches the `.csproj` files, see [Dependabot changesets for NuGet](../docs/CHANGESETS.md#dependabot-changesets-for-nuget).                                                                                                                                                                              |
+
+## Using pnpm
+
+The templates use npm. For a pnpm repo, pin pnpm in the root `package.json`
+(`"packageManager": "pnpm@11.22.0"`) and change every workflow that installs dependencies:
+
+- add an **Enable Corepack** step (`run: corepack enable`) right after **Setup Node.js**
+- `npm ci` → `pnpm install --frozen-lockfile`
+- `npx changeset …` → `pnpm exec changeset …`
+
+pnpm blocks dependency build scripts by default. List the ones you need under `allowBuilds` in
+`pnpm-workspace.yaml`. If a package sets `publishConfig.registry` or a scope registry, move it to
+`.npmrc` as well (see the pnpm note in
+[Publishing to public npm](../docs/CHANGESETS.md#publishing-to-public-npm)).
+
+## Action pins
+
+The templates pin actions to major versions (`actions/checkout@v7`). A repo that pins exact
+versions (`actions/checkout@v7.0.1`) can keep doing so: Dependabot keeps the precision of each ref
+when it updates it. `changesets/action@v2` is a branch, not a tag, so Dependabot never proposes
+updates for it. Pin an exact tag such as `@v2.1.2` if you want Dependabot to track it.
 
 ## Required secrets
 
